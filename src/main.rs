@@ -1,6 +1,6 @@
 #![allow(unstable_features)]
 #![feature(slice_flatten)]
-use std::{ops, fmt::Display};
+use std::{ops::{self, Mul}, fmt::Display};
 
 #[derive(Debug, Clone, Copy)]
 struct Vector<const S: usize> {
@@ -8,10 +8,6 @@ struct Vector<const S: usize> {
 }
 
 impl<const S: usize> Vector<S> {
-    fn new(vector: [f32; S]) -> Self {
-        return Self { vector }
-    }
-
     fn dot(self, rhs: Self) -> f32 {
         let mut rtn = 0.0;
         (0..S).into_iter().for_each(|i| rtn += self[i] * rhs[i]);
@@ -103,20 +99,12 @@ impl<const S: usize, const T: usize> Matrix<S, T> {
         let size = Matrix::<T, S>::SIZE;
         self.into_iter().enumerate().for_each(|(i, v)| {
             if i != Self::SIZE - 1 {
-                mirror[i*S % (size - 1)] = v
+                mirror[i*T % (size - 1)] = v
             } else {
                 mirror[Self::SIZE - 1] = v
             }
         } );
         return mirror
-    }
-}
-
-impl<const S: usize, const T: usize> Matrix<S, T> {
-    fn mul<const U: usize>(&self, rhs: Matrix<U, S>) -> Matrix<U, T> {
-        let rhs = rhs.diag_mirror();
-        let size = Matrix::<U, T>::SIZE;
-        (0..size).into_iter().map(|i| self.matrix[i / U].dot(rhs.matrix[i % U])).collect()
     }
 }
 
@@ -141,10 +129,21 @@ impl<const S: usize, const T: usize> ops::Add for Matrix<S, T> {
     }
 }
 
+impl<const S: usize, const T: usize, const U: usize> Mul<Matrix<U, S>> for Matrix<S, T> {
+    type Output = Matrix<U, T>;
+
+    fn mul(self, rhs: Matrix<U, S>) -> Self::Output {
+        let rhs = rhs.diag_mirror();
+        let size = Matrix::<U, T>::SIZE;
+        (0..size).into_iter().map(|i| self.matrix[i / U].dot(rhs.matrix[i % U])).collect()
+    }
+}
+
 impl<const S: usize, const T: usize> ops::Index<usize> for Matrix<S, T> {
     type Output = f32;
 
     fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < Self::SIZE);
         let t = index / S;
         let s = index % S;
         return &self.matrix[t][s]
@@ -153,6 +152,7 @@ impl<const S: usize, const T: usize> ops::Index<usize> for Matrix<S, T> {
 
 impl<const S: usize, const T: usize> ops::IndexMut<usize> for Matrix<S, T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        assert!(index < Self::SIZE);
         let t = index / S;
         let s = index % S;
         return &mut self.matrix[t][s]
@@ -178,17 +178,16 @@ impl<const S: usize, const T: usize> FromIterator<f32> for Matrix<S, T> {
 }
 
 fn main() {
-    println!("Hello, world!");
     let matrix1 = Matrix::new([
-        [2.0, 7.0, 3.0],
-        [4.0, 3.0, 2.0],
-    ]);
-
-    let matrix2 = Matrix::new([
         [3.0, 3.0],
         [1.0, 2.0],
         [0.0, 6.0],
     ]);
 
-    println!("{}", matrix1.mul(matrix2))
+    let matrix2 = Matrix::new([
+        [2.0, 7.0, 3.0, 2.0],
+        [4.0, 3.0, 2.0, 3.0],
+    ]);
+
+    println!("{}", matrix1 * matrix2)
 }
